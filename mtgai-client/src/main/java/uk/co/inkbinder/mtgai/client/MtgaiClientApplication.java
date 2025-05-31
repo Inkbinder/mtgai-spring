@@ -2,7 +2,10 @@ package uk.co.inkbinder.mtgai.client;
 
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.advisor.vectorstore.QuestionAnswerAdvisor;
-import org.springframework.ai.document.Document;
+import org.springframework.ai.chat.prompt.PromptTemplate;
+import org.springframework.ai.rag.advisor.RetrievalAugmentationAdvisor;
+import org.springframework.ai.rag.retrieval.search.VectorStoreDocumentRetriever;
+import org.springframework.ai.template.st.StTemplateRenderer;
 import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -25,15 +28,37 @@ public class MtgaiClientApplication {
 
 	@Bean
 	public CommandLineRunner runner(ChatClient.Builder builder) {
+
+		PromptTemplate customPromptTemplate = PromptTemplate.builder()
+				.renderer(StTemplateRenderer.builder().startDelimiterToken('<').endDelimiterToken('>').build())
+				.template("""
+            <query>
+
+            Context information is below.
+
+			---------------------
+			<question_answer_context>
+			---------------------
+			
+			You are an expert on Magic: The Gathering rules.
+			Given the context information and no prior knowledge, answer the query.
+
+			Follow these rules:
+
+			1. If the answer is not in the context, just say that you don't know.
+			2. Avoid statements like "Based on the context..." or "The provided information...".
+            """)
+				.build();
+
+
 		return args -> {
 			ChatClient chatClient = builder.build();
-						String response = chatClient.prompt().system("""							
-					You are an expert on Magic: The Gathering rules.
-					Answer the following question based on the provided context from the MTG Comprehensive Rules.
-					If the answer cannot be found in the context, say "I don't have enough information to answer that question."
-""")
-								.advisors(QuestionAnswerAdvisor.builder(vectorStore).searchRequest(SearchRequest.builder().similarityThreshold(0.3).topK(4).build()).build())
-								.user("Explain first strike").call().content();
+						String response = chatClient.prompt("Explain first strike")
+								.advisors(RetrievalAugmentationAdvisor.builder().documentRetriever(
+												VectorStoreDocumentRetriever.builder().similarityThreshold(0.30)
+														.vectorStore(vectorStore).build()
+										).build())
+								.call().content();
 			System.out.println(response);
 		};
 	}

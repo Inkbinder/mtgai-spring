@@ -57,7 +57,7 @@ public class MtgaiConfiguration {
             loadVectorStore(chromaVectorStore);
             ChromaApi.Collection col2 = chromaApi.getCollection("mtg-ai", "mtg-rules", "mtg-comprehensive-rules");
             log.info("Loaded vector store {}", chromaApi.countEmbeddings("mtg-ai", "mtg-rules", col2.id()));
-        };
+        }
         return chromaVectorStore;
     }
 
